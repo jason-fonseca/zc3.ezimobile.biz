@@ -1,0 +1,78 @@
+<?php 
+error_reporting(0);
+set_time_limit(999);
+$writabledirs = array();
+function Find_files($dir, $pattern) {
+	global $writabledirs;
+	$arr = array();
+	if ($handle = opendir($dir)) {
+		while (false !== ($entry = readdir($handle))) {
+			
+			if ($entry != "." && $entry != "..") {
+				
+				if(is_dir($dir."/".$entry))
+				{
+				echo "$dir/$entry:".is_writable($dir."/".$entry);
+				    if(is_writeable($dir."/".$entry)) $writabledirs[] = $dir."/".$entry;
+					$arr = array_merge($arr,Find_files($dir."/".$entry,$pattern));
+				}
+				elseif(preg_match($pattern,$entry))
+				{
+					$arr[] = $dir."/".$entry;
+				}
+				
+			}
+		}
+		closedir($handle);
+	}
+	
+	return $arr;
+}
+
+#sort matches
+function sortByLength($a,$b){
+		return strlen($b)-strlen($a);
+}
+
+function Find($searchFor, $secondSearch){
+	//will need to mod this later to go up one dir and start the search because this will be placed in the /ezimobile folder
+	global $writabledirs;
+	$matches = Find_files(dirname(__FILE__), '/^index.php$/');
+	usort($matches,'sortByLength');
+	$matches = array_reverse($matches);
+
+	foreach($matches as $path) {
+		$stream = file_get_contents($path);
+		
+		$found = false;
+		foreach($searchFor as $term)
+			if(strpos($stream, $term)!==FALSE)
+			{
+				if(strpos($stream, $secondSearch)!==FALSE)
+				{
+					$found=true;
+					break;
+				}
+			}
+		
+		if($found) {
+			header('HTTP/1.0 200 OK');
+			$path = str_replace("index.php","",$path);
+			$path = array( "catalog_physical" => $path, 
+					"catalog_relative" => str_replace(dirname(__FILE__), "", $path),
+					"home_physical" => dirname(__FILE__),
+					"writeabledirs" => implode($writeabledirs,",")
+    			              );
+			
+			
+			echo http_build_query($path);
+			die;
+		}
+		
+	}
+	
+}
+Find(array('osCommerce','Zen Cart'), "require('includes/application_top.php');");
+
+header('HTTP/1.0 404 Not Found');
+die;
